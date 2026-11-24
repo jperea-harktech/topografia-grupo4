@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Topografía en edificaciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: herramienta de obra seria, clara y táctil; el docente puede cambiar cualquier dato
+   IDEA: la pantalla de una estación total sobre el plano de replanteo, con cinta de señalización
+   PICTURE: planta de ejes viva (estación arrastrable) + limbo horizontal animado; sección de nivelación; diana de plomada
+   COLOUR and TYPE: gris concreto, tinta grafito, azul de plano para ejes, naranja de seguridad como acento; Barlow Condensed + Barlow + mono para lecturas
+   LAYOUT: barra superior con pestañas; cada módulo: dibujo grande + panel instrumento; datos en panel plegable; tabla abajo */
+:root{color-scheme:light dark;
+--bg:light-dark(#ecebe7,#121416);--card:light-dark(#fff,#1b1e21);--ink:light-dark(#191c1f,#eceef0);--mut:light-dark(#5b636b,#99a2ab);
+--line:light-dark(#d6d7d3,#2d3236);--soft:light-dark(#f5f5f2,#16191b);--blue:light-dark(#1d64a8,#6eb2f0);--acc:#ff5a1f;--acc2:light-dark(#c63f0c,#ff8a5c);
+--ok:light-dark(#18794a,#4fcf8c);--bad:light-dark(#c8102e,#ff6b7d);--lcd:light-dark(#1b2a22,#0b120e);--lcdt:#b9f5cf}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Barlow Condensed",sans-serif;line-height:1.05;margin:0;text-wrap:balance}
+h1{font-size:clamp(26px,3.4vw,36px)}h2{font-size:clamp(28px,3.6vw,40px)}h3{font-size:22px}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+header{background:var(--ink);color:var(--bg)}
+@media(min-width:760px){header{position:sticky;top:0;z-index:5}}
+.tape{height:8px;background:repeating-linear-gradient(-45deg,var(--acc) 0 14px,#1a1a1a 14px 28px)}
+.hbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px max(4vw,14px);max-width:1320px;margin:auto}
+.hbar h1{color:var(--bg);margin-right:auto}
+.hbar h1 small{display:block;font:500 13px Barlow,sans-serif;opacity:.75}
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:0 max(4vw,14px) 10px;max-width:1320px;margin:auto;scrollbar-width:none}
+.tabs a{flex:none;padding:10px 16px;border-radius:8px;color:var(--bg);text-decoration:none;font-weight:600;opacity:.75;min-height:44px;display:flex;align-items:center;gap:8px}
+.tabs a b{font:700 12px "JetBrains Mono",monospace;background:color-mix(in srgb,var(--bg) 18%,transparent);border-radius:4px;padding:1px 5px}
+.tabs a[aria-current=page]{background:var(--acc);color:#111;opacity:1}
+.tabs a[aria-current=page] b{background:#0002}
+main{max-width:1320px;margin:auto;padding:24px max(4vw,14px) 48px}
+.view{display:none}.view.on{display:block}
+.lead{color:var(--mut);max-width:72ch;margin:8px 0 18px}
+.split{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 1px 0 #0000000a,0 8px 24px -18px #0004}
+.fig{position:relative;height:clamp(340px,52vw,560px);border-radius:14px;background:var(--card);border:1px solid var(--line);overflow:hidden;touch-action:none}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.fig .hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:var(--mut);background:color-mix(in srgb,var(--card) 85%,transparent);padding:4px 8px;border-radius:6px;pointer-events:none}
+.fig .tools{position:absolute;left:10px;top:10px;display:flex;gap:6px}
+.inst{background:var(--lcd);color:var(--lcdt);border-radius:14px;padding:14px;border:6px solid light-dark(#2b2f33,#000)}
+.inst .row1{display:flex;justify-content:space-between;align-items:center;font-size:13px;opacity:.85}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-top:8px;align-items:baseline}
+.readout span{font-size:13px;opacity:.75}
+.readout b{font:700 clamp(22px,2.6vw,30px)/1.2 "JetBrains Mono",monospace;text-align:right}
+.dial{width:100%;aspect-ratio:1;max-height:300px;display:block;margin:6px auto 0}
+#needle{transition:transform .7s cubic-bezier(.2,.8,.2,1);transform-origin:150px 150px;transform-box:view-box}
+@media(prefers-reduced-motion:reduce){#needle{transition:none}}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button,.btn{font:600 15px Barlow,sans-serif;min-height:44px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#111}
+.inst button{background:#ffffff14;color:var(--lcdt);border-color:#ffffff26}
+.inst button.pri{background:var(--acc);color:#111;border-color:var(--acc)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.prog{height:10px;border-radius:5px;background:#ffffff1f;overflow:hidden;margin-top:10px}.prog i{display:block;height:100%;background:var(--acc);transition:width .4s}
+details.data{margin-top:18px}
+details.data summary{cursor:pointer;font-weight:700;padding:12px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);list-style:none;display:flex;justify-content:space-between;min-height:44px}
+details.data summary::after{content:"+";font-weight:700}details.data[open] summary::after{content:"−"}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px 14px;padding:14px 4px}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:3px}
+input,select{width:100%;font:16px Barlow,sans-serif;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);min-height:44px}
+input[type=range]{padding:0;accent-color:var(--acc);background:none;border:0}
+.scroll{overflow-x:auto;margin-top:14px;border-radius:12px;border:1px solid var(--line);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-weight:600;color:var(--mut);font-size:12.5px;background:var(--soft)}
+th:first-child,td:first-child{text-align:left}
+tbody tr{cursor:pointer}tbody tr:hover{background:var(--soft)}
+tr.sel td{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12.5px;font-weight:700}
+.chip.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.chip.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.chip.done{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
+.alerts{display:grid;gap:8px;margin-top:12px}
+.al{padding:10px 12px;border-radius:10px;border-left:6px solid var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--card));font-size:15px}
+.al.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--card))}
+.kp{display:flex;flex-wrap:wrap;gap:10px 26px}
+.kp div span{display:block;font-size:13px;color:var(--mut)}
+.kp b{font:700 clamp(24px,3vw,34px)/1.1 "Barlow Condensed",sans-serif}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.pills button{min-height:40px;padding:6px 12px}
+.pills button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pills button.bad{border-color:var(--bad)}
+.stages{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:14px 0}
+@media(max-width:900px){.stages{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stages button{text-align:left;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;gap:6px;border-top:6px solid var(--line)}
+.stages button span{font:700 13px "JetBrains Mono",monospace;color:var(--mut)}
+.stages button.on{border-top-color:var(--acc);background:var(--ink);color:var(--bg)}
+.q3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+@media(max-width:760px){.q3{grid-template-columns:minmax(0,1fr)}}
+.q3 .card h3{font-size:18px;color:var(--acc2);margin-bottom:6px}
+.steps{counter-reset:s;display:grid;gap:10px}
+.step{counter-increment:s;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 52px;position:relative}
+.step::before{content:counter(s);position:absolute;left:14px;top:12px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px}
+.step .f{font-family:"JetBrains Mono",monospace;font-size:14px;background:var(--soft);border-radius:8px;padding:8px 10px;margin-top:6px;overflow-x:auto;white-space:nowrap}
+.check{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;align-items:end}
+.verdict{margin-top:10px;font-weight:700}
+.note{font-size:13px;color:var(--mut)}
+footer{max-width:1320px;margin:auto;padding:20px max(4vw,14px) 40px;color:var(--mut);font-size:14px;border-top:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}
+.toast.on{opacity:1}
+svg text{font-family:Barlow,sans-serif}
+.drag{cursor:grab}.drag:active{cursor:grabbing}
+html{scroll-padding-top:120px}
+</style>
+</head>
+<body>
+<header>
+  <div class="tape" aria-hidden="true"></div>
+  <div class="hbar">
+    <h1>Topografía en edificaciones<small>Replanteo de ejes · niveles NPT · verticalidad — Topografía II, Grupo 4</small></h1>
+    <button id="reset" style="background:transparent;color:inherit;border-color:#ffffff40">Restaurar caso</button>
+  </div>
+  <nav class="tabs" aria-label="Módulos">
+    <a href="#proceso"><b>0</b>Proceso</a><a href="#replanteo"><b>1</b>Replanteo</a><a href="#niveles"><b>2</b>Niveles</a><a href="#verticalidad"><b>3</b>Verticalidad</a><a href="#validacion"><b>✓</b>Validación</a>
+  </nav>
+</header>
+<main>
+
+<section class="view" id="v-proceso">
+  <h2>¿Cómo se replantean ejes y se controlan niveles y verticalidad?</h2>
+  <p class="lead">La topografía fija dónde va cada elemento, a qué altura y que quede a plomo. Toca una etapa de la obra para ver qué dato topográfico necesita, cuándo se usa y qué pasa si está mal.</p>
+  <div class="stages" id="stages"></div>
+  <div class="card" id="stageCard"></div>
+</section>
+
+<section class="view" id="v-replanteo">
+  <h2>Replanteo de ejes desde una estación</h2>
+  <p class="lead">Arrastra la estación <b>E-1</b> o la vista atrás <b>PC-2</b> y toca cualquier intersección. El limbo gira hasta el ángulo que hay que medir con la estación en 0°00'00" sobre PC-2.</p>
+  <div class="split">
+    <div class="fig" id="planBox"><svg id="plan" role="img" aria-label="Planta de ejes, estación y visuales"></svg>
+      <div class="tools"><button id="fit" title="Ajustar vista">Ajustar</button></div>
+      <div class="hint">Arrastra E-1 / PC-2 · toca un punto</div></div>
+    <div class="inst" aria-live="polite">
+      <div class="row1"><span>ESTACIÓN E-1 · Hz 0° en PC-2</span><span id="ptName" class="mono">A-1</span></div>
+      <svg class="dial" viewBox="0 0 300 300" id="dial" aria-hidden="true"></svg>
+      <div class="readout">
+        <span>Hz a girar</span><b id="rHz">—</b>
+        <span>Distancia</span><b id="rD">—</b>
+        <span>Azimut</span><b id="rAz" style="font-size:20px">—</b>
+      </div>
+      <div class="btns">
+        <button id="prev" aria-label="Punto anterior">◀</button>
+        <button id="mark" class="pri" style="flex:1">Marcar replanteado</button>
+        <button id="next" aria-label="Punto siguiente">▶</button>
+      </div>
+      <div class="prog"><i id="progBar"></i></div>
+      <div class="row1" style="margin-top:6px"><span id="progTxt"></span><span id="stCheck"></span></div>
+    </div>
+  </div>
+  <div class="alerts" id="al1"></div>
+  <details class="data"><summary>Datos del replanteo</summary>
+    <div class="fields">
+      <div><label for="f-a1e">Este de A-1 (m)</label><input id="f-a1e" data-k="a1e" inputmode="decimal"></div>
+      <div><label for="f-a1n">Norte de A-1 (m)</label><input id="f-a1n" data-k="a1n" inputmode="decimal"></div>
+      <div><label for="f-sx">Luces ejes de letras (m)</label><input id="f-sx" data-k="sx"><div class="note" id="px-sx"></div></div>
+      <div><label for="f-sy">Luces ejes de números (m)</label><input id="f-sy" data-k="sy"><div class="note" id="px-sy"></div></div>
+      <div><label for="f-rot">Giro de la grilla θ (°)</label><input id="f-rot" data-k="rot" inputmode="decimal"></div>
+      <div><label for="f-ee">Este E-1</label><input id="f-ee" data-k="ee" inputmode="decimal"></div>
+      <div><label for="f-en">Norte E-1</label><input id="f-en" data-k="en" inputmode="decimal"></div>
+      <div><label for="f-ve">Este PC-2</label><input id="f-ve" data-k="ve" inputmode="decimal"></div>
+      <div><label for="f-vn">Norte PC-2</label><input id="f-vn" data-k="vn" inputmode="decimal"></div>
+      <div><label for="f-vd">Distancia medida a PC-2 (m)</label><input id="f-vd" data-k="vd" inputmode="decimal"></div>
+      <div><label for="f-tolr">Tolerancia comprobación (mm)</label><input id="f-tolr" data-k="tolr" inputmode="decimal"></div>
+    </div>
+  </details>
+  <div class="btns"><button id="cp1">Copiar tabla de replanteo</button><button id="clr">Reiniciar avance</button></div>
+  <div class="scroll"><table id="t1"><thead><tr><th>Punto</th><th>Este</th><th>Norte</th><th>Azimut</th><th>Hz desde PC-2</th><th>D (m)</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="view" id="v-niveles">
+  <h2>Traslado del nivel de piso terminado</h2>
+  <p class="lead">Elige un punto y mueve la lectura de mira. Cota = AI − VM: si la mira lee menos, el piso está más alto.</p>
+  <div class="split">
+    <div class="fig"><svg id="sec" role="img" aria-label="Sección de nivelación"></svg></div>
+    <div class="card">
+      <div class="kp"><div><span>Altura de instrumento AI</span><b id="nAI" class="mono">—</b></div><div><span>Lectura objetivo</span><b id="nObj" class="mono">—</b></div></div>
+      <div class="pills" id="npills"></div>
+      <label for="vmR">Vista adelante VM de <b id="nP"></b></label>
+      <input type="range" id="vmR" step="0.001">
+      <div class="kp" style="margin-top:6px"><div><span>VM</span><b id="nVM" class="mono">—</b></div><div><span>Cota</span><b id="nC" class="mono">—</b></div><div><span>Diferencia</span><b id="nD" class="mono">—</b></div></div>
+      <div class="btns"><button id="addn">+ Punto</button><button id="deln">Quitar punto</button></div>
+    </div>
+  </div>
+  <div class="fig" style="height:260px;margin-top:18px"><svg id="bars" role="img" aria-label="Diferencias respecto al NPT"></svg></div>
+  <div class="alerts" id="al2"></div>
+  <details class="data"><summary>Datos de nivelación</summary>
+    <div class="fields">
+      <div><label for="f-bm">Cota BM-1 (m)</label><input id="f-bm" data-k="bm" inputmode="decimal"></div>
+      <div><label for="f-va">Vista atrás en BM (m)</label><input id="f-va" data-k="va" inputmode="decimal"></div>
+      <div><label for="f-npt">NPT de diseño (m)</label><input id="f-npt" data-k="npt" inputmode="decimal"></div>
+      <div><label for="f-toln">Tolerancia ± (mm)</label><input id="f-toln" data-k="toln" inputmode="decimal"></div>
+      <div><label for="f-nname">Nombre del punto elegido</label><input id="f-nname"></div>
+      <div><label for="f-nvm">VM exacta del punto (m)</label><input id="f-nvm" inputmode="decimal"></div>
+    </div>
+  </details>
+</section>
+
+<section class="view" id="v-verticalidad">
+  <h2>Verticalidad de columnas</h2>
+  <p class="lead">Arrastra el punto naranja de la diana: es el tope de la columna visto desde arriba. El círculo verde es la tolerancia. A la derecha, la columna en elevación con el desplome exagerado.</p>
+  <div class="pills" id="cpills"></div>
+  <div class="split">
+    <div class="fig"><svg id="diana" role="img" aria-label="Diana de desplome"></svg><div class="hint">Arrastra el tope · cada anillo = tolerancia</div></div>
+    <div class="card">
+      <div class="kp"><div><span>Desplome d</span><b id="cD" class="mono">—</b></div><div><span>Relación</span><b id="cR" class="mono">—</b></div><div><span>Tolerancia</span><b id="cT" class="mono">—</b></div></div>
+      <div style="height:230px;position:relative;margin-top:8px"><svg id="elev" style="position:absolute;inset:0;width:100%;height:100%" role="img" aria-label="Columna en elevación"></svg></div>
+      <p class="note" id="cDir"></p>
+    </div>
+  </div>
+  <div class="fig" style="height:340px;margin-top:18px"><svg id="vplan" role="img" aria-label="Desplomes en planta"></svg><div class="hint">Todas las columnas · flechas exageradas</div></div>
+  <div class="alerts" id="al3"></div>
+  <details class="data"><summary>Datos de verticalidad</summary>
+    <div class="fields">
+      <div><label for="f-H">Altura H (m)</label><input id="f-H" data-k="H" inputmode="decimal"></div>
+      <div><label for="f-n">Tolerancia H / n, n =</label><input id="f-n" data-k="n" inputmode="decimal"></div>
+      <div><label for="f-tmax">Tope máximo (mm)</label><input id="f-tmax" data-k="tmax" inputmode="decimal"></div>
+      <div><label for="f-ex">Exageración del dibujo (×)</label><input id="f-ex" data-k="ex" inputmode="decimal"></div>
+      <div><label for="f-cdE">ΔE de la columna elegida (mm)</label><input id="f-cdE" inputmode="decimal"></div>
+      <div><label for="f-cdN">ΔN de la columna elegida (mm)</label><input id="f-cdN" inputmode="decimal"></div>
+      <div><label for="f-cadd">Agregar columna en eje</label><select id="f-cadd"></select></div>
+    </div>
+    <p class="note">La tolerancia la fija el grupo (por defecto H/500 y 25 mm). Verificarla con la especificación del proyecto o ACI 117 antes de exponer.</p>
+  </details>
+  <div class="scroll"><table id="t3"><thead><tr><th>Columna</th><th>E base</th><th>N base</th><th>E tope</th><th>N tope</th><th>ΔE mm</th><th>ΔN mm</th><th>d mm</th><th>H/d</th><th>Dirección</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="view" id="v-validacion">
+  <h2>Validación: el cálculo a mano, paso a paso</h2>
+  <p class="lead">Elige un caso. Se muestra cada fórmula con los números reemplazados, tomados de los datos actuales. Escribe tu resultado hecho a mano y comprueba si coincide.</p>
+  <div class="pills" id="vtype"></div>
+  <div class="split">
+    <div class="steps" id="vsteps"></div>
+    <div class="card"><h3>Tu resultado a mano</h3><div class="check" id="vcheck" style="margin-top:10px"></div><button class="pri" id="vgo" style="margin-top:12px;width:100%">Comprobar</button><div class="verdict" id="vres" aria-live="polite"></div></div>
+  </div>
+</section>
+</main>
+<footer>Artefacto del Grupo 4 · Topografía II. Programado con IA (Claude) a partir de las fórmulas, datos y criterios del grupo. Caso de ejemplo con datos ficticios: edificio de 4 pisos en Lima, UTM WGS84 zona 18S.</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const DEF={a1e:279500,a1n:8664300,sx:"5.00, 5.50, 5.00",sy:"6.00, 4.50, 6.00",rot:0,ee:279492,en:8664295,ve:279520,vn:8664290,vd:28.445,tolr:5,
+ bm:154.320,va:1.465,npt:154.850,toln:5,H:2.80,n:500,tmax:25,ex:400,
+ niv:[{p:"A-1",v:.935},{p:"B-1",v:.937},{p:"B-2",v:.931},{p:"C-2",v:.929},{p:"C-3",v:.943},{p:"D-4",v:.938}],
+ col:[{c:"A-1",dE:2,dN:1},{c:"B-2",dE:4,dN:3},{c:"C-2",dE:-3,dN:6},{c:"B-3",dE:7,dN:2},{c:"C-4",dE:0,dN:-3},{c:"D-3",dE:1,dN:-2}],
+ sel:"A-1",done:{},ni:0,ci:0,vt:"rep"};
+const clone=o=>JSON.parse(JSON.stringify(o));
+let S;try{S=JSON.parse(localStorage.getItem("g4topo")||"null")}catch(_){S=null}
+if(!S||!S.niv)S=clone(DEF);
+const save=()=>{try{localStorage.setItem("g4topo",JSON.stringify(S))}catch(_){}};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nm=v=>{const x=parseFloat(String(v).replace(",","."));return isFinite(x)?x:0};
+function lstRaw(v){const s=String(v).trim();if(!s)return[];let parts;
+ if(s.includes(";"))parts=s.split(/[;\s]+/);else if(s.includes(".")||/,\s/.test(s))parts=s.split(/[,\s]+/);else parts=s.split(/\s+/);
+ return parts.filter(Boolean).map(t=>{const x=parseFloat(t.replace(",","."));return{t,x,ok:isFinite(x)&&x>0&&/^[+]?\d*[.,]?\d+$/.test(t)}})}
+const lst=v=>lstRaw(v).filter(o=>o.ok).map(o=>o.x);
+const fmm=x=>{const r=Math.round(x*10)/10;return(r>0?"+":"")+(Math.abs(r-Math.round(r))<1e-9?r.toFixed(0):r.toFixed(1))};
+const f3=v=>v.toFixed(3);
+const az=(dE,dN)=>((Math.atan2(dE,dN)*180/Math.PI)%360+360)%360;
+function dms(a,p=2){a=((a%360)+360)%360;let d=Math.floor(a),m=Math.floor((a-d)*60),s=(a-d-m/60)*3600;const k=10**p;s=Math.round(s*k)/k;if(s>=60){s=0;m++}if(m>=60){m=0;d++}if(d>=360)d-=360;return d+"°"+String(m).padStart(2,"0")+"'"+s.toFixed(p).padStart(p?p+3:2,"0")+'"'}
+const toast=t=>{const e=$("toast");e.textContent=t;e.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove("on"),1800)};
+
+/* ---------- modelo ---------- */
+function grid(){const sx=lst(S.sx),sy=lst(S.sy),t=nm(S.rot)*Math.PI/180,E0=nm(S.a1e),N0=nm(S.a1n);
+ const xs=[0],ys=[0];sx.forEach(d=>xs.push(xs.at(-1)+d));sy.forEach(d=>ys.push(ys.at(-1)+d));
+ const P=(x,y)=>[E0+x*Math.cos(t)+y*Math.sin(t),N0-x*Math.sin(t)+y*Math.cos(t)];
+ const pts=[];ys.forEach((y,j)=>xs.forEach((x,i)=>{const[E,N]=P(x,y);pts.push({id:String.fromCharCode(65+i)+"-"+(j+1),i,j,x,y,E,N})}));
+ const EE=nm(S.ee),EN=nm(S.en),VE=nm(S.ve),VN=nm(S.vn),azv=az(VE-EE,VN-EN),dv=Math.hypot(VE-EE,VN-EN);
+ pts.forEach(p=>{p.dE=p.E-EE;p.dN=p.N-EN;p.az=az(p.dE,p.dN);p.h=((p.az-azv)%360+360)%360;p.D=Math.hypot(p.dE,p.dN)});
+ return{xs,ys,P,pts,EE,EN,VE,VN,azv,dv,t};}
+const tolC=()=>{const H=nm(S.H),n=nm(S.n),t=nm(S.tmax);const a=H>0&&n>0?H*1000/n:Infinity,b=t>0?t:Infinity;return Math.min(a,b)};
+const tolMsg=()=>{const m=[];if(!(nm(S.H)>0))m.push("La altura H debe ser mayor que 0.");if(!(nm(S.n)>0))m.push(nm(S.tmax)>0?"n en H/n no es válido: solo se aplica el tope máximo.":"n en H/n no es válido y no hay tope máximo: no se puede evaluar la verticalidad.");return m};
+function cols(G){const tol=tolC(),H=nm(S.H);return S.col.map(c=>{const p=G.pts.find(q=>q.id===c.c)||{E:NaN,N:NaN},miss=!isFinite(p.E);const d=Math.hypot(c.dE,c.dN);return{...c,miss,eb:p.E,nb:p.N,et:p.E+c.dE/1000,nt:p.N+c.dN/1000,d,r:d>0?H*1000/d:Infinity,dir:az(c.dE,c.dN),ok:!miss&&isFinite(tol)&&d<=tol+1e-9,tol}})}
+function nivs(){const AI=nm(S.bm)+nm(S.va),NPT=nm(S.npt),tol=nm(S.toln);return S.niv.map(r=>{const c=AI-r.v,d=Math.round((c-NPT)*1e6)/1000;return{...r,c,d,ok:Math.abs(d)<=tol+1e-9}})}
+
+/* ---------- vista de planta compartida ---------- */
+function makeView(svg,pts,pad){const W=svg.clientWidth||600,H=svg.clientHeight||400;const Es=pts.map(p=>p[0]),Ns=pts.map(p=>p[1]);
+ const a=Math.min(...Es),b=Math.max(...Es),c=Math.min(...Ns),d=Math.max(...Ns);const k=Math.min((W-2*pad)/((b-a)||1),(H-2*pad)/((d-c)||1));
+ const ox=(W-k*(b-a))/2,oy=(H-k*(d-c))/2;return{W,H,k,X:e=>ox+(e-a)*k,Y:n=>H-oy-(n-c)*k,iX:x=>a+(x-ox)/k,iY:y=>c+(H-oy-y)/k}}
+function gridSvg(V,G,lab=true){let s="";const ex=1.6,X1=G.xs.at(-1),Y1=G.ys.at(-1);
+ G.xs.forEach((x,i)=>{const[a,b]=[G.P(x,-ex),G.P(x,Y1+ex)];s+=`<line x1="${V.X(a[0])}" y1="${V.Y(a[1])}" x2="${V.X(b[0])}" y2="${V.Y(b[1])}" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="10 4 2 4" opacity=".8"/>`;if(lab)s+=`<circle cx="${V.X(b[0])}" cy="${V.Y(b[1])-13}" r="12" fill="var(--card)" stroke="var(--blue)" stroke-width="1.5"/><text x="${V.X(b[0])}" y="${V.Y(b[1])-8.5}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--blue)">${String.fromCharCode(65+i)}</text>`});
+ G.ys.forEach((y,j)=>{const[a,b]=[G.P(-ex,y),G.P(X1+ex,y)];s+=`<line x1="${V.X(a[0])}" y1="${V.Y(a[1])}" x2="${V.X(b[0])}" y2="${V.Y(b[1])}" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="10 4 2 4" opacity=".8"/>`;if(lab)s+=`<circle cx="${V.X(b[0])+13}" cy="${V.Y(b[1])}" r="12" fill="var(--card)" stroke="var(--blue)" stroke-width="1.5"/><text x="${V.X(b[0])+13}" y="${V.Y(b[1])+4.5}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--blue)">${j+1}</text>`});
+ return s}
+
+/* ---------- 0 proceso ---------- */
+const STG=[
+ ["Trazo inicial","Poligonal de apoyo y puntos de control PC-1, PC-2 y BM con cota.","Coordenadas de los PC y cota del BM.","Al inicio, antes de mover tierra; se conservan hasta la entrega.","Todo el edificio queda corrido o a otra altura: choques con linderos y redes.",null],
+ ["Replanteo de ejes","Estación total en E-1 orientada a PC-2; se marcan las intersecciones y se fijan en caballetes.","Ángulo horario Hz y distancia D a cada intersección.","Antes de excavar zapatas y cimientos.","Zapatas corridas y luces distintas a las del cálculo estructural.","replanteo"],
+ ["Cimentación","Niveles de fondo de excavación y solado; ejes trasladados al solado.","Cota de fondo y de solado.","Excavación, solado y armado de zapatas.","Peralte distinto al diseñado, sobreexcavación o falta de recubrimiento.","niveles"],
+ ["Columnas","Replanteo de la sección y control del plomo del encofrado antes del vaciado.","Coordenadas de base y tope, altura H.","Encofrado de cada columna y placa, antes de vaciar.","Desplome: excentricidad de cargas y vigas que no calzan.","verticalidad"],
+ ["Losas y NPT","Traslado de nivel desde el BM con nivel automático; marcas de +1.00 m.","Cota BM, vista atrás, vista adelante, NPT de diseño.","Fondo de losa, vaciado y contrapiso.","Pisos desnivelados, gradas desiguales, empozamiento.","niveles"],
+ ["Pisos superiores","Transmisión de ejes con plomada láser y niveles con wincha desde la marca de +1.00.","Ejes de referencia y cotas por piso.","En cada piso nuevo.","Error acumulado piso a piso.","verticalidad"],
+ ["Monitoreo","Nivelación periódica de puntos fijos en columnas.","Cotas repetidas en el tiempo.","Durante y después de la obra.","No se detecta a tiempo un asentamiento diferencial.","niveles"]];
+let sgi=1;
+function rProceso(){ $("stages").innerHTML=STG.map((s,i)=>`<button data-sg="${i}" class="${i===sgi?"on":""}"><span>${i+1}</span>${s[0]}</button>`).join("");
+ const s=STG[sgi];$("stageCard").innerHTML=`<h3>${s[0]}</h3><p>${s[1]}</p><div class="q3"><div class="card"><h3>¿Qué dato se necesita?</h3>${s[2]}</div><div class="card"><h3>¿En qué etapa se usa?</h3>${s[3]}</div><div class="card"><h3>¿Qué pasa si está mal?</h3>${s[4]}</div></div>${s[5]?`<div class="btns"><a class="btn" href="#${s[5]}" style="text-decoration:none">Abrir el módulo de ${s[5]} →</a></div>`:""}`}
+
+/* ---------- 1 replanteo ---------- */
+let V1=null,drag=null;
+function buildDial(){let s=`<circle cx="150" cy="150" r="140" fill="#ffffff08" stroke="#ffffff30"/>`;
+ for(let a=0;a<360;a+=5){const L=a%30?6:a%90?12:18,r=a%30?136:132,t=a*Math.PI/180;s+=`<line x1="${150+140*Math.sin(t)}" y1="${150-140*Math.cos(t)}" x2="${150+(140-L)*Math.sin(t)}" y2="${150-(140-L)*Math.cos(t)}" stroke="#b9f5cf" stroke-opacity="${a%30?.35:.8}"/>`;if(a%30===0)s+=`<text x="${150+112*Math.sin(t)}" y="${154-112*Math.cos(t)}" text-anchor="middle" font-size="12" fill="#b9f5cf" opacity=".8">${a}</text>`}
+ s+=`<path id="arc" fill="#ff5a1f" fill-opacity=".22" stroke="#ff5a1f" stroke-width="1.5"/><g id="nArrow"></g><text x="150" y="30" text-anchor="middle" font-size="11" fill="#b9f5cf">PC-2 · 0°</text>
+ <g id="needle"><line x1="150" y1="150" x2="150" y2="22" stroke="#ff5a1f" stroke-width="4" stroke-linecap="round"/><circle cx="150" cy="22" r="6" fill="#ff5a1f"/></g><circle cx="150" cy="150" r="9" fill="#b9f5cf"/>`;$("dial").innerHTML=s}
+function rDial(p,G){const h=p.h,t=h*Math.PI/180,r=95;$("needle").style.transform=`rotate(${h}deg)`;
+ $("arc").setAttribute("d",h<.01?"":`M150 150 L150 ${150-r} A${r} ${r} 0 ${h>180?1:0} 1 ${150+r*Math.sin(t)} ${150-r*Math.cos(t)} Z`);
+ const nr=-G.azv*Math.PI/180;$("nArrow").innerHTML=`<g transform="translate(${150+62*Math.sin(nr)} ${150-62*Math.cos(nr)})"><polygon points="0,-11 -6,5 6,5" fill="#b9f5cf" opacity=".7" transform="rotate(${-G.azv})"/><text y="${Math.cos(nr)<0?-14:20}" text-anchor="middle" font-size="11" font-weight="700" fill="#b9f5cf">N</text></g>`}
+function rReplanteo(fit){const G=grid();const svg=$("plan");if(!G.pts.length)return;
+ if(fit||!V1||!drag)V1=makeView(svg,[...G.pts.map(p=>[p.E,p.N]),[G.EE,G.EN],[G.VE,G.VN]],62);const V=V1;
+ if(!G.pts.find(p=>p.id===S.sel))S.sel=G.pts[0].id;const sp=G.pts.find(p=>p.id===S.sel);
+ let s=gridSvg(V,G);
+ s+=`<line x1="${V.X(G.EE)}" y1="${V.Y(G.EN)}" x2="${V.X(G.VE)}" y2="${V.Y(G.VN)}" stroke="var(--mut)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+ G.pts.forEach(p=>{if(p!==sp)s+=`<line x1="${V.X(G.EE)}" y1="${V.Y(G.EN)}" x2="${V.X(p.E)}" y2="${V.Y(p.N)}" stroke="var(--line)" stroke-width="1"/>`});
+ const r=34,a0=G.azv*Math.PI/180,a1=sp.az*Math.PI/180,ex=V.X(G.EE),ey=V.Y(G.EN);
+ s+=`<path d="M${ex} ${ey} L${ex+r*Math.sin(a0)} ${ey-r*Math.cos(a0)} A${r} ${r} 0 ${sp.h>180?1:0} 1 ${ex+r*Math.sin(a1)} ${ey-r*Math.cos(a1)} Z" fill="var(--acc)" opacity=".18"/>`;
+ s+=`<line x1="${ex}" y1="${ey}" x2="${V.X(sp.E)}" y2="${V.Y(sp.N)}" stroke="var(--acc)" stroke-width="3.5"/>`;
+ const mx=(ex+V.X(sp.E))/2,my=(ey+V.Y(sp.N))/2;s+=`<rect x="${mx-34}" y="${my-12}" width="68" height="22" rx="5" fill="var(--acc)"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#111">${f3(sp.D)} m</text>`;
+ G.pts.forEach(p=>{const on=p===sp,dn=S.done[p.id];s+=`<g data-pt="${esc(p.id)}" style="cursor:pointer"><circle cx="${V.X(p.E)}" cy="${V.Y(p.N)}" r="16" fill="transparent"/>${dn?`<circle cx="${V.X(p.E)}" cy="${V.Y(p.N)}" r="9" fill="none" stroke="var(--ok)" stroke-width="2.5"/>`:""}<circle cx="${V.X(p.E)}" cy="${V.Y(p.N)}" r="${on?7:4.5}" fill="${on?"var(--acc)":dn?"var(--ok)":"var(--ink)"}"/></g>`});
+ s+=`<text x="${V.X(sp.E)+10}" y="${V.Y(sp.N)+20}" font-size="14" font-weight="700" fill="var(--acc2)">${esc(sp.id)}</text>`;
+ s+=`<g class="drag" data-drag="st"><circle cx="${ex}" cy="${ey}" r="22" fill="var(--acc)" opacity=".15"/><polygon points="${ex},${ey-13} ${ex-10},${ey+8} ${ex+10},${ey+8}" fill="var(--acc)" stroke="var(--ink)" stroke-width="1.5"/><text x="${ex}" y="${ey+26}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">E-1</text></g>`;
+ s+=`<g class="drag" data-drag="va"><circle cx="${V.X(G.VE)}" cy="${V.Y(G.VN)}" r="20" fill="var(--mut)" opacity=".15"/><rect x="${V.X(G.VE)-6}" y="${V.Y(G.VN)-6}" width="12" height="12" fill="var(--mut)"/><text x="${V.X(G.VE)}" y="${V.Y(G.VN)+24}" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--mut)">PC-2</text></g>`;
+ s+=`<g transform="translate(${V.W-30},34)"><polygon points="0,-18 -7,4 0,0 7,4" fill="var(--ink)"/><text y="20" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">N</text></g>`;
+ svg.innerHTML=s;
+ $("ptName").textContent=sp.id;$("rHz").textContent=dms(sp.h);$("rD").textContent=f3(sp.D)+" m";$("rAz").textContent=dms(sp.az);rDial(sp,G);
+ const nd=G.pts.filter(p=>S.done[p.id]).length;$("progBar").style.width=(100*nd/G.pts.length)+"%";$("progTxt").textContent=`${nd} de ${G.pts.length} replanteados`;
+ $("mark").textContent=S.done[sp.id]?"Desmarcar":"Marcar replanteado";
+ const noVd=String(S.vd??"").trim()==="",vd=nm(S.vd),diff=(vd-G.dv)*1000,tol=nm(S.tolr),okS=noVd||Math.abs(diff)<=tol;$("stCheck").textContent=noVd?"Sin comprobar":okS?"Estación OK":"Revisar estación";
+ const lw=[];["sx","sy"].forEach(k=>{const L=lstRaw(S[k]),g=L.filter(o=>o.ok);$("px-"+k).textContent=g.length?`Se leen ${g.length} luces: ${g.map(o=>o.x.toFixed(2)).join(" | ")} (total ${g.reduce((a,o)=>a+o.x,0).toFixed(2)} m)`:"Sin luces válidas";L.filter(o=>!o.ok).forEach(o=>lw.push(`<div class="al">Luz «${esc(o.t)}» en ${k==="sx"?"ejes de letras":"ejes de números"} no es un número positivo: se ignoró.</div>`))});
+ const al=[...lw];al.push(noVd?`<div class="al" style="border-color:var(--mut);background:var(--card)">Ingresa la <b>distancia medida a PC-2</b> para comprobar la estación antes de replantear.</div>`:okS?`<div class="al ok"><b>Comprobación de estación correcta.</b> Medida a PC-2 ${f3(vd)} m, calculada ${f3(G.dv)} m: diferencia ${diff.toFixed(1)} mm (≤ ±${tol} mm).</div>`:`<div class="al"><b>No replantear todavía.</b> Medida a PC-2 ${f3(vd)} m vs. calculada ${f3(G.dv)} m: ${diff.toFixed(1)} mm, más que ±${tol} mm. Revisar estacionamiento o coordenadas.</div>`);
+ G.pts.filter(p=>p.D<1.5).forEach(p=>al.push(`<div class="al">${esc(p.id)} está a ${f3(p.D)} m de la estación: muy cerca para medir.</div>`));
+ $("al1").innerHTML=al.join("");
+ $("t1").tBodies[0].innerHTML=G.pts.map(p=>`<tr data-pt="${esc(p.id)}" class="${p===sp?"sel":""}"><td><b>${esc(p.id)}</b></td><td>${f3(p.E)}</td><td>${f3(p.N)}</td><td>${dms(p.az)}</td><td><b>${dms(p.h)}</b></td><td><b>${f3(p.D)}</b></td><td>${S.done[p.id]?'<span class="chip done">Replanteado</span>':'<span class="chip" style="color:var(--mut)">Pendiente</span>'}</td></tr>`).join("")}
+
+/* ---------- 2 niveles ---------- */
+function rNiveles(){const R=nivs(),AI=nm(S.bm)+nm(S.va),NPT=nm(S.npt),tol=nm(S.toln),obj=AI-NPT;
+ if(!R.length){S.niv.push({p:"P-1",v:+obj.toFixed(3)});return rNiveles()}
+ S.ni=Math.min(S.ni,R.length-1);const r=R[S.ni];
+ $("nAI").textContent=f3(AI);$("nObj").textContent=f3(obj);
+ $("npills").innerHTML=R.map((x,i)=>`<button data-ni="${i}" class="${i===S.ni?"on":""} ${x.ok?"":"bad"}">${esc(x.p)}</button>`).join("");
+ const vr=$("vmR");vr.min=(obj-.02).toFixed(3);vr.max=(obj+.02).toFixed(3);vr.value=r.v;
+ $("nP").textContent=r.p;$("nVM").textContent=f3(r.v);$("nC").textContent=f3(r.c);$("nD").textContent=`${fmm(r.d)} mm`;$("nD").style.color=`var(${r.ok?"--ok":"--bad"})`;
+ if(document.activeElement!==$("f-nname"))$("f-nname").value=r.p;if(document.activeElement!==$("f-nvm"))$("f-nvm").value=f3(r.v);
+ // sección
+ const svg=$("sec"),W=svg.clientWidth||600,H=svg.clientHeight||400,yL=H*.2,k=(H*.62)/Math.max(nm(S.va),r.v,1.6),gy=H*.93;
+ const xb=W*.14,xi=W*.47,xp=W*.8,yBM=yL+nm(S.va)*k,yP=yL+r.v*k,yN=yL+obj*k,amp=Math.max(-40,Math.min(40,r.d*3));
+ let s=`<defs><pattern id="hat" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line y2="8" stroke="var(--mut)" stroke-width="1" opacity=".5"/></pattern></defs>`;
+ s+=`<rect x="0" y="${gy}" width="${W}" height="${H-gy}" fill="url(#hat)"/><line x1="0" x2="${W}" y1="${gy}" y2="${gy}" stroke="var(--mut)"/>`;
+ s+=`<line x1="${xb-40}" x2="${xp+60}" y1="${yL}" y2="${yL}" stroke="var(--acc)" stroke-width="2" stroke-dasharray="7 5"/><text x="${(xb+xi)/2}" y="${yL-10}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--acc2)">Visual · AI = ${f3(AI)}</text>`;
+ s+=`<rect x="${xb-22}" y="${yBM}" width="44" height="${gy-yBM}" fill="var(--mut)" opacity=".35"/><text x="${xb}" y="${gy-8}" text-anchor="middle" font-size="12" fill="var(--ink)">BM-1</text><text x="${xb}" y="${yBM+16}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">${f3(nm(S.bm))}</text>`;
+ const rod=(x,y0,y1,lab)=>`<rect x="${x-5}" y="${y0}" width="10" height="${y1-y0}" fill="var(--card)" stroke="var(--ink)"/>${Array.from({length:Math.floor((y1-y0)/(k*.1))},(_,i)=>`<rect x="${x-5}" y="${y1-(i+1)*k*.1}" width="10" height="${k*.05}" fill="${i%10<5?"var(--bad)":"var(--ink)"}" opacity=".8"/>`).join("")}<text x="${x+12}" y="${(y0+y1)/2}" font-size="13" font-weight="700" fill="var(--ink)">${lab}</text>`;
+ s+=rod(xb,yL-14,yBM,"VA "+f3(nm(S.va)));
+ s+=`<line x1="${xi}" y1="${yL+6}" x2="${xi-30}" y2="${gy}" stroke="var(--ink)" stroke-width="2"/><line x1="${xi}" y1="${yL+6}" x2="${xi+30}" y2="${gy}" stroke="var(--ink)" stroke-width="2"/><line x1="${xi}" y1="${yL+6}" x2="${xi}" y2="${gy}" stroke="var(--ink)" stroke-width="2"/><rect x="${xi-26}" y="${yL-11}" width="52" height="20" rx="5" fill="var(--ink)"/><circle cx="${xi+26}" cy="${yL-1}" r="6" fill="var(--blue)"/><text x="${xi+36}" y="${yL+28}" font-size="12" fill="var(--mut)">Nivel</text>`;
+ const yS=yN-amp;s+=`<rect x="${xp-70}" y="${yS}" width="140" height="${gy-yS}" fill="var(--blue)" opacity=".16"/><line x1="${xp-70}" x2="${xp+70}" y1="${yS}" y2="${yS}" stroke="var(--blue)" stroke-width="3"/>`;
+ s+=`<line x1="${xp-90}" x2="${xp+90}" y1="${yN}" y2="${yN}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${xp+72}" y="${yN+16}" font-size="12" fill="var(--ok)" text-anchor="end">NPT ${f3(NPT)}</text>`;
+ s+=rod(xp,yL-14,yS,"VM "+f3(r.v));
+ s+=`<text x="${xp}" y="${gy-10}" text-anchor="middle" font-size="13" font-weight="700" fill="${r.ok?"var(--ok)":"var(--bad)"}">${esc(r.p)} · ${fmm(r.d)} mm</text>`;
+ s+=`<text x="${W-10}" y="${H-6}" text-anchor="end" font-size="11" fill="var(--mut)">Desnivel del piso exagerado ×3 px/mm</text>`;
+ svg.innerHTML=s;
+ // barras
+ const b=$("bars"),BW=b.clientWidth||600,BH=b.clientHeight||260,pl=44,pb=30,pt=24,m=Math.max(tol*2,...R.map(x=>Math.abs(x.d)))||1;
+ const Y=v=>pt+(BH-pt-pb)/2-(v/m)*((BH-pt-pb)/2),bw=(BW-pl-14)/R.length;
+ let t=`<rect x="${pl}" y="${Y(tol)}" width="${BW-pl-14}" height="${Y(-tol)-Y(tol)}" fill="var(--ok)" opacity=".12"/>`;
+ [m,tol,0,-tol,-m].forEach(v=>t+=`<line x1="${pl}" x2="${BW-14}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===0?"var(--ink)":"var(--line)"}" ${v?'stroke-dasharray="4 4"':""}/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="var(--mut)">${v>0?"+":""}${Math.round(v)}</text>`);
+ t+=`<text x="${pl}" y="15" font-size="12" fill="var(--mut)">Diferencia respecto al NPT (mm) · banda verde = ±${tol} mm · toca una barra</text>`;
+ R.forEach((x,i)=>{const X=pl+i*bw+bw*.22,w=bw*.56,y0=Y(0),y1=Y(x.d);t+=`<g data-ni="${i}" style="cursor:pointer"><rect x="${pl+i*bw}" y="${pt}" width="${bw}" height="${BH-pt-pb}" fill="${i===S.ni?"var(--acc)":"transparent"}" opacity=".08"/><rect x="${X}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(Math.abs(y1-y0),2)}" rx="3" fill="${x.ok?"var(--blue)":"var(--bad)"}"/><text x="${X+w/2}" y="${BH-10}" text-anchor="middle" font-size="12" font-weight="${i===S.ni?700:400}" fill="var(--ink)">${esc(x.p)}</text></g>`});
+ b.innerHTML=t;
+ $("al2").innerHTML=R.filter(x=>!x.ok).map(x=>`<div class="al"><b>${esc(x.p)}</b>: cota ${f3(x.c)} m, ${fmm(x.d)} mm respecto al NPT. ${x.d>0?"Piso alto: rebajar antes del acabado.":"Piso bajo: nivelar con contrapiso."}</div>`).join("")||`<div class="al ok">Todos los puntos dentro de ±${tol} mm.</div>`}
+
+/* ---------- 3 verticalidad ---------- */
+let VD=null;
+function rVert(){const G=grid(),C=cols(G);if(!C.length){$("cpills").innerHTML="";return}
+ S.ci=Math.min(S.ci,C.length-1);const c=C[S.ci],tol=c.tol,H=nm(S.H),ex=nm(S.ex)||400;
+ $("cpills").innerHTML=C.map((x,i)=>`<button data-ci="${i}" class="${i===S.ci?"on":""} ${x.ok?"":"bad"}">${esc(x.c)}</button>`).join("");
+ $("cD").textContent=c.d.toFixed(1)+" mm";$("cD").style.color=`var(${c.ok?"--ok":"--bad"})`;$("cR").textContent=isFinite(c.r)?"H/"+c.r.toFixed(0):"—";$("cT").textContent=isFinite(tol)?tol.toFixed(1)+" mm":"—";
+ $("cDir").textContent=c.d>0?`Columna ${c.c}: el tope se inclina hacia azimut ${dms(c.dir)} (ΔE ${c.dE.toFixed(1)} mm, ΔN ${c.dN.toFixed(1)} mm).`:`Columna ${c.c}: a plomo.`;
+ if(document.activeElement!==$("f-cdE"))$("f-cdE").value=c.dE;if(document.activeElement!==$("f-cdN"))$("f-cdN").value=c.dN;
+ const free=G.pts.filter(p=>!S.col.some(q=>q.c===p.id));$("f-cadd").innerHTML=`<option value="">Elegir…</option>`+free.map(p=>`<option>${esc(p.id)}</option>`).join("");
+ // diana
+ const d=$("diana"),W=d.clientWidth||600,Hh=d.clientHeight||400,cx=W/2,cy=Hh/2,R=Math.min(W,Hh)*.42,tolD=isFinite(tol)?tol:10,sc=R/(tolD*2.2);VD={cx,cy,sc};
+ let s=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="var(--soft)" stroke="var(--line)"/><circle cx="${cx}" cy="${cy}" r="${2*tolD*sc}" fill="none" stroke="var(--bad)" stroke-dasharray="5 5" opacity=".6"/><circle cx="${cx}" cy="${cy}" r="${tolD*sc}" fill="var(--ok)" fill-opacity=".14" stroke="var(--ok)" stroke-width="2"/>`;
+ s+=`<line x1="${cx-R}" x2="${cx+R}" y1="${cy}" y2="${cy}" stroke="var(--line)"/><line y1="${cy-R}" y2="${cy+R}" x1="${cx}" x2="${cx}" stroke="var(--line)"/><text x="${cx}" y="${cy-R-8}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">N</text><text x="${cx+R+8}" y="${cy+4}" font-size="13" font-weight="700" fill="var(--ink)">E</text>`;
+ s+=`<text x="${cx+tolD*sc*.71+4}" y="${cy-tolD*sc*.71-4}" font-size="12" fill="var(--ok)">${isFinite(tol)?tol.toFixed(1)+" mm":"sin tol."}</text><text x="${cx+2*tolD*sc*.71+4}" y="${cy-2*tolD*sc*.71-4}" font-size="12" fill="var(--bad)">${isFinite(tol)?(2*tol).toFixed(1):""}</text>`;
+ const tx=cx+c.dE*sc,ty=cy-c.dN*sc;s+=`<rect x="${cx-9}" y="${cy-9}" width="18" height="18" fill="var(--ink)" opacity=".85"/><text x="${cx-14}" y="${cy+24}" text-anchor="end" font-size="12" fill="var(--mut)">base</text>`;
+ s+=`<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="${c.ok?"var(--blue)":"var(--bad)"}" stroke-width="3"/><g class="drag" data-drag="top"><circle cx="${tx}" cy="${ty}" r="24" fill="var(--acc)" opacity=".18"/><circle cx="${tx}" cy="${ty}" r="11" fill="var(--acc)" stroke="var(--ink)" stroke-width="2"/></g><text x="${tx+16}" y="${ty-14}" font-size="13" font-weight="700" fill="var(--ink)">tope ${esc(c.c)}</text>`;
+ d.innerHTML=s;
+ // elevación
+ const e=$("elev"),EW=e.clientWidth||300,EH=e.clientHeight||230,bx=EW/2,by=EH-24,top=22,hp=by-top,off=Math.max(-EW*.3,Math.min(EW*.3,c.d*ex*hp/(H*1000)));
+ e.innerHTML=`<line x1="20" x2="${EW-20}" y1="${by}" y2="${by}" stroke="var(--mut)" stroke-width="2"/><polygon points="${bx-14},${by} ${bx+14},${by} ${bx+14+off},${top} ${bx-14+off},${top}" fill="var(--mut)" opacity=".28" stroke="${c.ok?"var(--blue)":"var(--bad)"}" stroke-width="2"/><line x1="${bx}" y1="${by}" x2="${bx}" y2="${top-6}" stroke="var(--ink)" stroke-dasharray="4 4"/><line x1="${bx}" y1="${top-8}" x2="${bx+off}" y2="${top-8}" stroke="var(--acc)" stroke-width="3"/><text x="${bx+off/2}" y="${top-14}" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--acc2)">d = ${c.d.toFixed(1)} mm</text><text x="${bx-off*0-22}" y="${(by+top)/2}" text-anchor="end" font-size="12" fill="var(--mut)">H = ${H.toFixed(2)} m</text><text x="${EW-14}" y="${EH-6}" text-anchor="end" font-size="11" fill="var(--mut)">exagerado ×${ex}</text>`;
+ // planta general
+ const vp=$("vplan"),V=makeView(vp,G.pts.map(p=>[p.E,p.N]),56);let t=gridSvg(V,G);
+ C.forEach((x,i)=>{if(!isFinite(x.eb))return;const X=V.X(x.eb),Y=V.Y(x.nb),k=V.k*ex/1000;t+=`<g data-ci="${i}" style="cursor:pointer"><circle cx="${X}" cy="${Y}" r="${isFinite(x.tol)?x.tol*k:0}" fill="var(--ok)" fill-opacity=".12" stroke="var(--ok)" stroke-width=".8"/><rect x="${X-6}" y="${Y-6}" width="12" height="12" fill="${i===S.ci?"var(--acc)":"var(--ink)"}"/><line x1="${X}" y1="${Y}" x2="${X+x.dE*k}" y2="${Y-x.dN*k}" stroke="${x.ok?"var(--blue)":"var(--bad)"}" stroke-width="3" stroke-linecap="round"/><circle cx="${X+x.dE*k}" cy="${Y-x.dN*k}" r="3.5" fill="${x.ok?"var(--blue)":"var(--bad)"}"/><text x="${X-9}" y="${Y+19}" text-anchor="end" font-size="12" font-weight="600" fill="var(--ink)">${esc(x.c)}</text></g>`});
+ vp.innerHTML=t;
+ $("al3").innerHTML=tolMsg().map(m=>`<div class="al">${m}</div>`).join("")+C.filter(x=>x.miss).map(x=>`<div class="al"><b>Columna ${esc(x.c)}</b>: el eje no existe en la grilla actual. Revisa las luces o quita la columna.</div>`).join("")+C.filter(x=>!x.ok&&!x.miss&&isFinite(x.tol)).map(x=>`<div class="al"><b>Columna ${esc(x.c)}</b>: desplome ${x.d.toFixed(1)} mm (H/${x.r.toFixed(0)}) hacia ${dms(x.dir,0)}, supera ${tol.toFixed(1)} mm. Corregir el encofrado antes del vaciado.</div>`).join("")||`<div class="al ok">Todas las columnas dentro de tolerancia (${tol.toFixed(1)} mm).</div>`;
+ $("t3").tBodies[0].innerHTML=C.map((x,i)=>`<tr data-ci="${i}" class="${i===S.ci?"sel":""}"><td><b>${esc(x.c)}</b></td>${x.miss?'<td colspan="4" style="text-align:center;color:var(--bad)">Eje no existe</td>':`<td>${f3(x.eb)}</td><td>${f3(x.nb)}</td><td>${f3(x.et)}</td><td>${f3(x.nt)}</td>`}<td>${x.dE.toFixed(1)}</td><td>${x.dN.toFixed(1)}</td><td><b>${x.d.toFixed(1)}</b></td><td>${isFinite(x.r)?"H/"+x.r.toFixed(0):"—"}</td><td>${dms(x.dir)}</td><td><span class="chip ${x.ok?"ok":"bad"}">${x.miss?"Sin eje":!isFinite(x.tol)?"Sin tolerancia":x.ok?"Cumple":"No cumple"}</span></td></tr>`).join("")}
+
+/* ---------- validación ---------- */
+function vCase(){const G=grid();
+ if(S.vt==="rep"){const p=G.pts.find(q=>q.id===S.sel)||G.pts[0];const dE=G.VE-G.EE,dN=G.VN-G.EN;
+  return{title:`Replanteo de ${p.id}`,steps:[
+   ["Azimut de la vista atrás PC-2",`ΔE = ${f3(G.VE)} − ${f3(G.EE)} = ${f3(dE)}   ΔN = ${f3(G.VN)} − ${f3(G.EN)} = ${f3(dN)}`,`Az = atan2(${f3(dE)}, ${f3(dN)}) = ${G.azv.toFixed(4)}° = ${dms(G.azv)}`],
+   [`Coordenadas de ${p.id}`,`x = ${p.x.toFixed(2)} m  ·  y = ${p.y.toFixed(2)} m  ·  θ = ${nm(S.rot)}°`,`E = ${f3(p.E)}   N = ${f3(p.N)}`],
+   [`Diferencias desde E-1`,`ΔE = ${f3(p.E)} − ${f3(G.EE)} = ${f3(p.dE)}`,`ΔN = ${f3(p.N)} − ${f3(G.EN)} = ${f3(p.dN)}`],
+   ["Azimut y distancia",`Az = atan2(${f3(p.dE)}, ${f3(p.dN)}) = ${p.az.toFixed(4)}° = ${dms(p.az)}`,`D = √(${f3(p.dE)}² + ${f3(p.dN)}²) = ${f3(p.D)} m`],
+   ["Ángulo a girar desde PC-2",`Hz = ${p.az.toFixed(4)}° − ${G.azv.toFixed(4)}°${p.az-G.azv<0?" + 360°":""}`,`Hz = ${p.h.toFixed(4)}° = ${dms(p.h)}`]],
+   check:[["Hz grados","°"],["minutos","'"],["segundos",'"'],["D (m)","m"]],
+   ans:v=>{const h=nm(v[0])+nm(v[1])/60+nm(v[2])/3600;const e1=Math.abs(((h-p.h+540)%360)-180)*3600,e2=Math.abs(nm(v[3])-p.D)*1000;return[e1<=1&&e2<=1,`Hz: diferencia ${e1.toFixed(1)}" (tolerancia 1") · D: diferencia ${e2.toFixed(1)} mm (tolerancia 1 mm)`]},
+   pick:G.pts.map(q=>q.id),cur:p.id}}
+ if(S.vt==="niv"){const R=nivs(),r=R[Math.min(S.ni,R.length-1)],AI=nm(S.bm)+nm(S.va);
+  return{title:`Nivel en ${r.p}`,steps:[["Altura de instrumento",`AI = Cota BM + VA = ${f3(nm(S.bm))} + ${f3(nm(S.va))}`,`AI = ${f3(AI)} m`],["Cota del punto",`Cota = AI − VM = ${f3(AI)} − ${f3(r.v)}`,`Cota = ${f3(r.c)} m`],["Comparación con el NPT",`Δ = ${f3(r.c)} − ${f3(nm(S.npt))} = ${fmm(r.d)} mm`,`|Δ| ${Math.abs(r.d)<=nm(S.toln)?"≤":">"} ${nm(S.toln)} mm → ${r.ok?"Cumple":"No cumple"}`]],
+   check:[["Cota (m)","m"],["Δ (mm)","mm"]],ans:v=>{const e1=Math.abs(nm(v[0])-r.c)*1000,e2=Math.abs(nm(v[1])-r.d);return[e1<=.5&&e2<=.5,`Cota: diferencia ${e1.toFixed(1)} mm · Δ: diferencia ${e2.toFixed(1)} mm`]},pick:R.map(x=>x.p),cur:r.p}}
+ const C=cols(G),c=C[Math.min(S.ci,C.length-1)],H=nm(S.H);
+ return{title:`Columna ${c.c}`,steps:[["Diferencias tope − base",`ΔE = (${f3(c.et)} − ${f3(c.eb)})·1000 = ${c.dE.toFixed(1)} mm`,`ΔN = (${f3(c.nt)} − ${f3(c.nb)})·1000 = ${c.dN.toFixed(1)} mm`],["Desplome",`d = √(${c.dE.toFixed(1)}² + ${c.dN.toFixed(1)}²)`,`d = ${c.d.toFixed(2)} mm   ·   H/d = ${(H*1000).toFixed(0)}/${c.d.toFixed(2)} = H/${isFinite(c.r)?c.r.toFixed(0):"∞"}`],["Tolerancia",`mín(H/n ; tope) = mín(${(H*1000).toFixed(0)}/${nm(S.n)} ; ${nm(S.tmax)}) = ${c.tol.toFixed(1)} mm`,`${c.d.toFixed(2)} ${c.ok?"≤":">"} ${c.tol.toFixed(1)} → ${c.ok?"Cumple":"No cumple"}`],["Dirección",`atan2(${c.dE.toFixed(1)}, ${c.dN.toFixed(1)})`,`= ${dms(c.dir)}`]],
+  check:[["d (mm)","mm"],["n en H/n",""]],ans:v=>{const e1=Math.abs(nm(v[0])-c.d),e2=isFinite(c.r)?Math.abs(nm(v[1])-c.r):(/^\s*$|∞|inf/i.test(v[1])?0:Infinity);return[e1<=.05&&e2<=1,`d: diferencia ${e1.toFixed(2)} mm · H/n: diferencia ${e2.toFixed(0)}`]},pick:C.map(x=>x.c),cur:c.c}}
+function rVal(){const v=vCase();
+ $("vtype").innerHTML=[["rep","Replanteo"],["niv","Nivel"],["col","Columna"]].map(([k,l])=>`<button data-vt="${k}" class="${S.vt===k?"on":""}">${l}</button>`).join("")+`<select id="vpick" style="width:auto;margin-left:6px" aria-label="Elegir caso">${v.pick.map(x=>`<option ${x===v.cur?"selected":""}>${esc(x)}</option>`).join("")}</select>`;
+ $("vsteps").innerHTML=v.steps.map(s=>`<div class="step"><b>${esc(s[0])}</b><div class="f">${esc(s[1])}</div><div class="f"><b>${esc(s[2])}</b></div></div>`).join("");
+ const k=v.check.map(c=>c[0]).join("|");if($("vcheck").dataset.k!==k){$("vcheck").dataset.k=k;$("vcheck").innerHTML=v.check.map((c,i)=>`<div><label for="vc${i}">${c[0]}</label><input id="vc${i}" inputmode="decimal"></div>`).join("");$("vres").textContent=""}}
+
+/* ---------- control ---------- */
+const VIEWS=["proceso","replanteo","niveles","verticalidad","validacion"];
+function route(){let h=location.hash.slice(1);if(!VIEWS.includes(h))h="replanteo";VIEWS.forEach(v=>$("v-"+v).classList.toggle("on",v===h));document.querySelectorAll(".tabs a").forEach(a=>a.toggleAttribute("aria-current",a.getAttribute("href")==="#"+h)&&a.setAttribute("aria-current","page"));all(true)}
+function fill(){document.querySelectorAll("[data-k]").forEach(i=>{if(document.activeElement!==i)i.value=S[i.dataset.k]})}
+function all(fit){save();rProceso();rReplanteo(fit);rNiveles();rVert();rVal()}
+document.addEventListener("input",e=>{const t=e.target;
+ if(t.dataset.k){S[t.dataset.k]=t.value;V1=null;all(true);return}
+ if(t.id==="vmR"){S.niv[S.ni].v=+(+t.value).toFixed(3);rNiveles();save();return}
+ if(t.id==="f-nname"){S.niv[S.ni].p=t.value;rNiveles();save();return}
+ if(t.id==="f-nvm"){S.niv[S.ni].v=nm(t.value);rNiveles();save();return}
+ if(t.id==="f-cdE"||t.id==="f-cdN"){S.col[S.ci][t.id==="f-cdE"?"dE":"dN"]=nm(t.value);rVert();save();return}});
+document.addEventListener("change",e=>{const t=e.target;
+ if(t.id==="f-cadd"&&t.value){S.col.push({c:t.value,dE:0,dN:0});S.ci=S.col.length-1;all();toast("Columna "+t.value+" agregada")}
+ if(t.id==="vpick"){const x=t.value;if(S.vt==="rep")S.sel=x;else if(S.vt==="niv")S.ni=S.niv.findIndex(r=>r.p===x);else S.ci=S.col.findIndex(r=>r.c===x);all()}});
+document.addEventListener("click",e=>{const t=e.target.closest("[data-pt],[data-ni],[data-ci],[data-sg],[data-vt]");if(!t)return;
+ if(t.dataset.pt){S.sel=t.dataset.pt;rReplanteo();rVal();save()}
+ else if(t.dataset.ni!==undefined){S.ni=+t.dataset.ni;rNiveles();rVal();save()}
+ else if(t.dataset.ci!==undefined){S.ci=+t.dataset.ci;rVert();rVal();save()}
+ else if(t.dataset.sg!==undefined){sgi=+t.dataset.sg;rProceso()}
+ else if(t.dataset.vt){S.vt=t.dataset.vt;rVal();save()}});
+const step=k=>{const G=grid(),i=G.pts.findIndex(p=>p.id===S.sel);S.sel=G.pts[(i+k+G.pts.length)%G.pts.length].id;rReplanteo();save()};
+$("prev").onclick=()=>step(-1);$("next").onclick=()=>step(1);
+$("mark").onclick=()=>{if(S.done[S.sel])delete S.done[S.sel];else{S.done[S.sel]=1;toast(S.sel+" replanteado");const G=grid();const nx=G.pts.find(p=>!S.done[p.id]);if(nx){S.sel=nx.id}else toast("¡Replanteo completo!")}rReplanteo();save()};
+$("clr").onclick=()=>{S.done={};rReplanteo();save()};
+$("fit").onclick=()=>{V1=null;rReplanteo(true)};
+$("reset").onclick=()=>{S=clone(DEF);fill();V1=null;all(true);toast("Caso de ejemplo restaurado")};
+$("addn").onclick=()=>{const AI=nm(S.bm)+nm(S.va);S.niv.push({p:"P-"+(S.niv.length+1),v:+(AI-nm(S.npt)).toFixed(3)});S.ni=S.niv.length-1;rNiveles();save()};
+$("deln").onclick=()=>{if(S.niv.length>1){S.niv.splice(S.ni,1);S.ni=Math.max(0,S.ni-1);rNiveles();save()}};
+$("cp1").onclick=async()=>{const G=grid();const txt=["Punto\tEste\tNorte\tAzimut\tHz\tD",...G.pts.map(p=>[p.id,f3(p.E),f3(p.N),dms(p.az),dms(p.h),f3(p.D)].join("\t"))].join("\n");try{await navigator.clipboard.writeText(txt);toast("Tabla copiada")}catch(_){toast("No se pudo copiar")}};
+$("vgo").onclick=()=>{const v=vCase(),vals=v.check.map((_,i)=>$("vc"+i).value);const[ok,msg]=v.ans(vals);$("vres").innerHTML=`<span class="chip ${ok?"ok":"bad"}" style="font-size:15px">${ok?"✓ Coincide con el artefacto":"✗ No coincide"}</span><p class="note">${esc(msg)}</p>`};
+// arrastre
+function svgPt(svg,e){const r=svg.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]}
+$("plan").addEventListener("pointerdown",e=>{const g=e.target.closest("[data-drag]");if(!g)return;drag=g.dataset.drag;$("plan").setPointerCapture(e.pointerId);e.preventDefault()});
+$("plan").addEventListener("pointermove",e=>{if(!drag||!V1)return;const[x,y]=svgPt($("plan"),e);const E=+V1.iX(x).toFixed(3),N=+V1.iY(y).toFixed(3);if(drag==="st"){S.ee=E;S.en=N}else{S.ve=E;S.vn=N}fill();rReplanteo()});
+const endDrag=()=>{if(drag){drag=null;save();rVal()}};$("plan").addEventListener("pointerup",endDrag);$("plan").addEventListener("pointercancel",endDrag);
+let dt=false;$("diana").addEventListener("pointerdown",e=>{if(!e.target.closest("[data-drag]"))return;dt=true;$("diana").setPointerCapture(e.pointerId);e.preventDefault()});
+$("diana").addEventListener("pointermove",e=>{if(!dt||!VD)return;const[x,y]=svgPt($("diana"),e);const c=S.col[S.ci];c.dE=Math.round((x-VD.cx)/VD.sc*2)/2;c.dN=Math.round((VD.cy-y)/VD.sc*2)/2;rVert()});
+$("diana").addEventListener("pointerup",()=>{if(dt){dt=false;save();rVal()}});
+document.addEventListener("keydown",e=>{if(!$("v-replanteo").classList.contains("on")||/INPUT|SELECT/.test(document.activeElement.tagName))return;if(e.key==="ArrowRight")step(1);if(e.key==="ArrowLeft")step(-1)});
+buildDial();fill();
+window.addEventListener("hashchange",route);route();
+const ro=new ResizeObserver(()=>{V1=null;all(true)});ro.observe($("planBox"));ro.observe($("diana"));
+}
+</script>
+</body>
+</html>
